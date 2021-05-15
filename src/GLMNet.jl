@@ -491,8 +491,6 @@ function glmnet(X::Matrix{Float64}, y::Vector{Float64},
         r = abs.(cor(X, y))[:]
         th = quantile(r, threshold)
         ind = findall(r .> th)
-        println("$(length(ind)) features selected...")
-        println("$(size(X[:, ind]))")
         g = glmnet!(copy(X[:, ind]), copy(y), family; kw...)
         ia = g.betas.ia
         for k = 1:g.betas.nin[end]
@@ -502,8 +500,11 @@ function glmnet(X::Matrix{Float64}, y::Vector{Float64},
     end
 end
 
-glmnet(X::AbstractMatrix, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
-    glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
+function glmnet(X::AbstractMatrix, y::AbstractVector{<:Number},
+                family::Distribution=Normal(), threshold::Float64=0.0; kw...)
+    glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), threshold, family; kw...)
+end
+
 glmnet(X::SparseMatrixCSC, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
@@ -534,7 +535,7 @@ include("Multinomial.jl")
 include("CoxNet.jl")
 
 function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractMatrix{<:Number}},
-                  family::Distribution=Normal();
+                  family::Distribution=Normal(), threshold::Float64=0.0;
                   weights::Vector{Float64}=ones(size(y, 1)),
                   offsets::Union{AbstractVector,AbstractMatrix,Nothing}=nothing,
                   rng=Random.GLOBAL_RNG,
@@ -555,9 +556,9 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
 
 
     if isa(family, Normal)
-        path = glmnet(X, y, family; weights = weights, kw...)
+        path = glmnet(X, y, family, threshold; weights = weights, kw...)
     else
-        path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
+        path = glmnet(X, y, family, threshold; weights = weights, offsets = offsets, kw...)
     end
 
     # In case user defined folds
@@ -578,10 +579,10 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
         holdoutidx = findall(f)
         modelidx = findall(!,f)
         if isa(family, Normal)
-            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family, threshold;
                         weights=weights[modelidx], lambda=path.lambda, kw...)
         else
-            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family, threshold;
                         weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :],
                         lambda=path.lambda, kw...)
         end
