@@ -4,6 +4,7 @@ using glmnet_jll
 using Distributions, StatsBase
 using Distributed, Printf, Random, SparseArrays
 using DataFrames
+using Statistics: cor, std
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
@@ -482,8 +483,25 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
     @check_and_return
 end
 
-glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
-    glmnet!(copy(X), copy(y), family; kw...)
+function glmnet(X::Matrix{Float64}, y::Vector{Float64},
+                family::Distribution=Normal(), threshold::Float64=0.0; kw...)
+    if threshold == 0
+        return glmnet!(copy(X), copy(y), family; kw...)
+    else
+        r = abs.(cor(X, y))[:]
+        th = quantile(r, threshold)
+        ind = findall(r .> th)
+        println("$(length(ind)) features selected...")
+        println("$(size(X[:, ind]))")
+        g = glmnet!(copy(X[:, ind]), copy(y), family; kw...)
+        ia = g.betas.ia
+        for k = 1:g.betas.nin[end]
+            ia[k] = ind[ia[k]]
+        end
+        return g
+    end
+end
+
 glmnet(X::AbstractMatrix, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::SparseMatrixCSC, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
