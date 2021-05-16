@@ -486,7 +486,7 @@ end
 function glmnet(X::Matrix{Float64}, y::Vector{Float64},
                 family::Distribution=Normal(), threshold::Float64=0.0; kw...)
     if threshold == 0
-        return glmnet!(X, y, family; kw...)
+        return glmnet!(copy(X), copy(y), family; kw...)
     else
         r = abs.(cor(X, y))[:]
         th = quantile(r, threshold)
@@ -507,12 +507,29 @@ end
 
 glmnet(X::SparseMatrixCSC, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Vector{Float64}, y), family; kw...)
-glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
-    glmnet!(copy(X), copy(y), family; kw...)
+
+function glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial,
+                threshold::Float64=0.0; kw...)
+    if threshold == 0
+        return glmnet!(copy(X), copy(y), family; kw...)
+    else
+        r = abs.(cor(X, y))[:]
+        th = quantile(r, threshold)
+        ind = findall(r .> th)
+        g = glmnet!(copy(X[:, ind]), copy(y), family; kw...)
+        ia = g.betas.ia
+        for k = 1:g.betas.nin[end]
+            ia[k] = ind[ia[k]]
+        end
+        return g
+    end
+end
+
 glmnet(X::SparseMatrixCSC, y::AbstractMatrix, family::Binomial; kw...) =
     glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Matrix{Float64}, y), family; kw...)
-glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
-    glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
+
+glmnet(X::Matrix, y::Matrix, family::Binomial, threshold::Float64=0.0; kw...) =
+    glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family, threshold; kw...)
 
 struct GLMNetCrossValidation
     path::Any
