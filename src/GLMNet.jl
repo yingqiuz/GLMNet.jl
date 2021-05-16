@@ -264,8 +264,8 @@ macro check_and_return()
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
-        X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMNetPath(family, a0[1:lmu], X, null_dev[], fdev[1:lmu], alm[1:lmu], Int(nlp[]))
+        betas = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
+        GLMNetPath(family, a0[1:lmu], betas, null_dev[], fdev[1:lmu], alm[1:lmu], Int(nlp[]))
     end)
 end
 
@@ -486,7 +486,7 @@ end
 function glmnet(X::Matrix{Float64}, y::Vector{Float64},
                 family::Distribution=Normal(), threshold::Float64=0.0; kw...)
     if threshold == 0
-        return glmnet!(copy(X), copy(y), family; kw...)
+        return glmnet!(X, y, family; kw...)
     else
         r = abs.(cor(X, y))[:]
         th = quantile(r, threshold)
